@@ -1,0 +1,23 @@
+#pragma once
+
+#include <map>
+#include <string>
+
+struct HttpRequest {
+    std::string method; 
+    std::string path; 
+    std::string version;
+    std::map<std::string, std::string> headers; 
+    std::string body;
+    std::string to_string() const;
+};
+
+
+class HttpRequestParser {
+public:
+    static HttpRequest parse(int client_fd);
+private:
+    static void parse_headers(HttpRequest& request, const std::string& header_data);
+    static void parse_request_line(HttpRequest& request, const std::string& line);
+    static size_t get_content_length(const HttpRequest& request);
+};
