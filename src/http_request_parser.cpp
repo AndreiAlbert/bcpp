@@ -1,5 +1,7 @@
 #include "../include/http_request_parser.hpp"
 #include "../include/logger.hpp"
+#include <algorithm>
+#include <cctype>
 #include <format>
 #include <sstream>
 #include <stdexcept>
@@ -7,7 +9,6 @@
 #include <sys/socket.h>
 
 
-// TODO changhe to vector<char>
 HttpRequest HttpRequestParser::parse(int client_fd) {
     constexpr size_t BUFFER_SIZE = 2048;
     HttpRequest request;
@@ -47,7 +48,7 @@ HttpRequest HttpRequestParser::parse(int client_fd) {
 
 std::string HttpRequest::to_string() const {
     std::ostringstream oss; 
-    oss << method << " " << path << " "  << version << "\r\n";
+    oss << HttpRequestParser::enum_to_string_method(method) << " " << path << " "  << version << "\r\n";
     for (const auto& [key, val]: headers) {
         oss << key << ": " << val << "\r\n";
     }
@@ -84,10 +85,12 @@ void HttpRequestParser::parse_headers(HttpRequest& request, const std::string& h
 
 void HttpRequestParser::parse_request_line(HttpRequest& request, const std::string& line) {
     std::istringstream iss(line);
-    iss >> request.method >> request.path >> request.version;
-    if (request.method.empty() || request.path.empty() || request.version.empty()) {
+    std::string method_str;
+    iss >> method_str >> request.path >> request.version;
+    if (method_str.empty() || request.path.empty() || request.version.empty()) {
         throw std::runtime_error("Invalid request line");
     }
+    request.method = string_to_enum_method(method_str);
 }
 
 size_t HttpRequestParser::get_content_length(const HttpRequest& request) {
@@ -100,4 +103,42 @@ size_t HttpRequestParser::get_content_length(const HttpRequest& request) {
         }
     }
     return 0;
+}
+
+RequestMethod HttpRequestParser::string_to_enum_method(const std::string& method) {
+    static const std::map<std::string, RequestMethod> method_map = {
+        {"GET", RequestMethod::GET},
+        {"HEAD", RequestMethod::HEAD},
+        {"OPTIONS", RequestMethod::OPTIONS},
+        {"POST", RequestMethod::POST},
+        {"DELETE", RequestMethod::DELETE},
+        {"PUT", RequestMethod::PUT},
+    };
+    std::string method_upper = method;
+    std::transform(method_upper.begin(), method_upper.end(), method_upper.begin(), 
+                   [](unsigned char c) {return std::toupper(c);});
+    auto it = method_map.find(method_upper);
+    if (it == method_map.end()) {
+        throw std::runtime_error(std::format("Invalid http method: {}", method));
+    }
+    return it->second;
+}
+
+std::string HttpRequestParser::enum_to_string_method(const RequestMethod& method) {
+    switch (method) {
+    case RequestMethod::GET:
+        return "GET";
+    case RequestMethod::HEAD:
+        return "HEAD";
+    case RequestMethod::OPTIONS:
+        return "OPTIONS";
+    case RequestMethod::POST:
+        return "POST";
+    case RequestMethod::DELETE:
+        return "DELETE";
+    case RequestMethod::PUT:
+        return "PUT";
+    default:
+        throw std::runtime_error("Unkown request method");
+    }
 }
