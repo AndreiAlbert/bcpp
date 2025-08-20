@@ -48,7 +48,7 @@ HttpRequest HttpRequestParser::parse(int client_fd) {
 
 std::string HttpRequest::to_string() const {
     std::ostringstream oss; 
-    oss << HttpRequestParser::enum_to_string_method(method) << " " << path << " "  << version << "\r\n";
+    oss << HttpRequestParser::enum_to_string_method(method) << " " << route << " "  << version << "\r\n";
     for (const auto& [key, val]: headers) {
         oss << key << ": " << val << "\r\n";
     }
@@ -86,8 +86,8 @@ void HttpRequestParser::parse_headers(HttpRequest& request, const std::string& h
 void HttpRequestParser::parse_request_line(HttpRequest& request, const std::string& line) {
     std::istringstream iss(line);
     std::string method_str;
-    iss >> method_str >> request.path >> request.version;
-    if (method_str.empty() || request.path.empty() || request.version.empty()) {
+    iss >> method_str >> request.route >> request.version;
+    if (method_str.empty() || request.route.empty() || request.version.empty()) {
         throw std::runtime_error("Invalid request line");
     }
     request.method = string_to_enum_method(method_str);

@@ -14,7 +14,7 @@ enum class RequestMethod {
 
 struct HttpRequest {
     RequestMethod method; 
-    std::string path; 
+    std::string route; 
     std::string version;
     std::map<std::string, std::string> headers; 
     std::string body;

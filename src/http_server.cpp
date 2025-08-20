@@ -12,6 +12,7 @@
 #include <netinet/in.h>
 #include <unistd.h>
 #include <format>
+#include <utility>
 
 std::atomic<bool> HttpServer::running(true);
 
@@ -22,7 +23,7 @@ void signal_handler(int signal) {
     }
 }
 
-HttpServer::HttpServer(int port, size_t number_threads): port(port), socket_fd(-1), pool(number_threads) {
+HttpServer::HttpServer(int port, size_t number_threads): router(Router()) ,port(port), socket_fd(-1), pool(number_threads) {
     struct sigaction sa; 
     sa.sa_handler = signal_handler;
     sigemptyset(&sa.sa_mask);
@@ -104,14 +105,19 @@ void HttpServer::handle_request(int client_fd) {
     if (!running) {
         return;
     }
-
     HttpRequest request = HttpRequestParser::parse(client_fd);
-    std::string parsed_request = request.to_string();
-    std::cout << parsed_request << std::endl;
-    ssize_t bytes_sent = send(client_fd, parsed_request.c_str(), parsed_request.size() , 0) ;
+    auto route_key = std::make_pair(request.method, request.route);
+    auto routes_it = router.get_route(route_key);
+    std::string response;
+    if (routes_it.has_value()) {
+        response = routes_it.value()->second(request); 
+    } else {
+        response = "HTTP/1.1 404 Not Found\r\nContent-Type: text/plain\r\n\r\nRoute not found";
+    }
+    ssize_t bytes_sent = send(client_fd, response.c_str(), response.size() , 0) ;
     if (bytes_sent < 0) {
         Logger::get_instance().error(std::format("Send failed for client {}: {}", client_fd, strerror(errno)));
-    } else if (bytes_sent < static_cast<ssize_t>(strlen(parsed_request.c_str()))) {
+    } else if (bytes_sent < static_cast<ssize_t>(strlen(response.c_str()))) {
         Logger::get_instance().warning(std::format("Incomplete send for client {}: sent {} bytes", client_fd, bytes_sent));
     } else {
         Logger::get_instance().info(std::format("Handled client request: {}", client_fd));

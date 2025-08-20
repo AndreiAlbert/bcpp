@@ -2,6 +2,7 @@
 
 #include "thread_pool.hpp"
 #include <atomic>
+#include "router.hpp"
 
 using socket_t = int;
 
@@ -11,6 +12,7 @@ public:
     ~HttpServer();
     bool start() throw();
     static std::atomic<bool> running;
+    Router router;
 private:
     int port;
     socket_t socket_fd;
