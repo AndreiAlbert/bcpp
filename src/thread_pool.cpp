@@ -1,7 +1,6 @@
 #include "../include/thread_pool.hpp"
 #include <functional>
 #include <mutex>
-#include <sstream>
 #include <thread>
 
 ThreadPool::ThreadPool(size_t number_threads) {
@@ -16,8 +15,6 @@ ThreadPool::ThreadPool(size_t number_threads) {
                     task = std::move(tasks.front());
                     tasks.pop();
                 }
-                std::ostringstream oss;
-                oss << std::this_thread::get_id();
                 task();
             }
         });
