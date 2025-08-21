@@ -2,13 +2,14 @@
 
 #include "thread_pool.hpp"
 #include <atomic>
+#include <thread>
 #include "router.hpp"
 
 using socket_t = int;
 
 class HttpServer {
 public:
-    HttpServer(int port, size_t number_threads);
+    HttpServer(int port=8080, size_t number_threads = std::thread::hardware_concurrency());
     ~HttpServer();
     bool start() throw();
     static std::atomic<bool> running;
