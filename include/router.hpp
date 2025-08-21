@@ -1,6 +1,7 @@
 #pragma once
 
 #include "http_request_parser.hpp"
+#include "http_response.hpp"
 #include <functional>
 #include <optional>
 #include <unordered_map>
@@ -12,13 +13,13 @@ struct RouteHash {
 };
 
 using route = std::pair<RequestMethod, std::string>;
-using routes_iterator = std::unordered_map<route, std::function<std::string(const HttpRequest&)>, RouteHash>::iterator;
+using routes_iterator = std::unordered_map<route, std::function<HttpResponse(const HttpRequest&)>, RouteHash>::iterator;
 
 class Router {
 private:
-    std::unordered_map<route, std::function<std::string(const HttpRequest&)>, RouteHash> routes;
+    std::unordered_map<route, std::function<HttpResponse(const HttpRequest&)>, RouteHash> routes;
 public:
     Router() = default;
-    void add_route(RequestMethod method, const std::string& route, std::function<std::string(const HttpRequest&)> handler);
+    void add_route(RequestMethod method, const std::string& route, std::function<HttpResponse(const HttpRequest&)> handler);
     std::optional<routes_iterator> get_route(route route);
 };

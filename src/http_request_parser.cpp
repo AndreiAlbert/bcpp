@@ -48,7 +48,7 @@ HttpRequest HttpRequestParser::parse(int client_fd) {
 
 std::string HttpRequest::to_string() const {
     std::ostringstream oss; 
-    oss << HttpRequestParser::enum_to_string_method(method) << " " << route << " "  << version << "\r\n";
+    oss << HttpRequestParser::enum_to_string_method(method) << " " << full_route << " "  << version << "\r\n";
     for (const auto& [key, val]: headers) {
         oss << key << ": " << val << "\r\n";
     }
@@ -85,12 +85,36 @@ void HttpRequestParser::parse_headers(HttpRequest& request, const std::string& h
 
 void HttpRequestParser::parse_request_line(HttpRequest& request, const std::string& line) {
     std::istringstream iss(line);
-    std::string method_str;
-    iss >> method_str >> request.route >> request.version;
-    if (method_str.empty() || request.route.empty() || request.version.empty()) {
+    std::string method_str, full_route;
+    iss >> method_str >> request.full_route >> request.version;
+    if (method_str.empty() || request.full_route.empty() || request.version.empty()) {
         throw std::runtime_error("Invalid request line");
     }
     request.method = string_to_enum_method(method_str);
+    full_route = request.full_route;
+
+    size_t query_pos = full_route.find('?');
+    std::string path; 
+    std::string query_params_path;
+    if (query_pos == std::string::npos) {
+        request.route = request.full_route;
+        return;
+    }
+    request.route = request.full_route.substr(0, query_pos);
+    path = full_route.substr(0, query_pos);
+    query_params_path = full_route.substr(query_pos + 1);
+    std::istringstream query_params_stream(query_params_path);
+    std::string param;
+    while(std::getline(query_params_stream, param, '&')) {
+        size_t eq_pos = param.find('=');
+        if (eq_pos != std::string::npos) {
+            std::string key = param.substr(0, eq_pos);
+            std::string value = param.substr(eq_pos + 1);
+            request.query_params[key] = value;
+        }else {
+            Logger::get_instance().warning(std::format("Skipping malformed query param: {}", param));
+        }
+    }
 }
 
 size_t HttpRequestParser::get_content_length(const HttpRequest& request) {

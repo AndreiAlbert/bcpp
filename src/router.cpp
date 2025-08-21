@@ -1,6 +1,8 @@
 #include "../include/router.hpp"
 #include <functional>
+#include <iostream>
 #include <optional>
+#include <ostream>
 #include <unordered_map>
 #include <utility>
 
@@ -10,11 +12,14 @@ size_t RouteHash::operator()(const std::pair<RequestMethod, std::string>& pair) 
     return h1 ^ (h2 << 1);
 }
 
-void Router::add_route(RequestMethod method, const std::string& route, std::function<std::string(const HttpRequest&)> handler) {
+void Router::add_route(RequestMethod method, const std::string& route, std::function<HttpResponse(const HttpRequest&)> handler) {
     routes.emplace(std::make_pair(method, route), handler);
 }
 
 std::optional<routes_iterator> Router::get_route(route route) {
+    if (route.second.find('?') != std::string::npos) {
+        route.second =  route.second.substr(0, route.second.find('?'));
+    }
     auto it = routes.find(route);
     if (it == routes.end()) {
         return std::nullopt;

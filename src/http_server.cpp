@@ -4,8 +4,6 @@
 #include <asm-generic/socket.h>
 #include <csignal>
 #include <cstring>
-#include <iostream>
-#include <ostream>
 #include <stdexcept>
 #include <string>
 #include <sys/socket.h>
@@ -110,7 +108,7 @@ void HttpServer::handle_request(int client_fd) {
     auto routes_it = router.get_route(route_key);
     std::string response;
     if (routes_it.has_value()) {
-        response = routes_it.value()->second(request); 
+        response = routes_it.value()->second(request).to_string(); 
     } else {
         response = "HTTP/1.1 404 Not Found\r\nContent-Type: text/plain\r\n\r\nRoute not found";
     }
