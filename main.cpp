@@ -1,11 +1,15 @@
 #include "include/http_request_parser.hpp"
+#include "include/http_response.hpp"
 #include "include/http_server.hpp"
-#include <thread>
 
 int main() {
-    HttpServer h(8080, std::thread::hardware_concurrency());
+    HttpServer h;
     h.router.add_route(RequestMethod::GET, "/hello", [](const HttpRequest& _) {
-        return "HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\n\r\nHello, World!";
+        HttpResponse response;
+        response.set_body("{\"message\": \"hei there\"}");
+        response.set_content_type(MimeType::ApplicationJson);
+        response.set_status(HttpStatusCode::OK);
+        return response;
     });
     h.start();
     return 0;
