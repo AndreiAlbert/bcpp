@@ -1,7 +1,9 @@
 #include "../include/http_server.hpp"
 #include "../include/logger.hpp"
 #include "../include/http_request_parser.hpp"
+#include <algorithm>
 #include <asm-generic/socket.h>
+#include <cctype>
 #include <csignal>
 #include <cstring>
 #include <stdexcept>
@@ -37,6 +39,14 @@ HttpServer::~HttpServer() {
         close(socket_fd);
         socket_fd = -1;
     }
+}
+
+void HttpServer::set_keep_alive_timeout(int seconds) {
+    keep_alive_timeout = seconds;
+}
+
+void HttpServer::set_max_requests(int max_requets) {
+    max_keep_alive_requests = max_requets;
 }
 
 bool HttpServer::start() throw() {
@@ -92,32 +102,90 @@ void HttpServer::run() {
             logger.error(std::format("Accept failed: {}", strerror(errno)));
             continue; 
         }
+        struct timeval tv;
+        tv.tv_sec = keep_alive_timeout;
+        tv.tv_usec = 0;
+        setsockopt(client_fd, SOL_SOCKET, SO_RCVTIMEO, (const char*)&tv, sizeof tv);
         pool.add_task([this, client_fd] {
-            handle_request(client_fd);
+            handle_connection(client_fd);
             close(client_fd);
         });
     }
 }
 
-void HttpServer::handle_request(int client_fd) {
+void HttpServer::handle_connection(int client_fd) {
     if (!running) {
         return;
     }
-    HttpRequest request = HttpRequestParser::parse(client_fd);
-    auto route_key = std::make_pair(request.method, request.route);
-    auto routes_it = router.get_route(route_key);
-    std::string response;
-    if (routes_it.has_value()) {
-        response = routes_it.value()->second(request).to_string(); 
-    } else {
-        response = "HTTP/1.1 404 Not Found\r\nContent-Type: text/plain\r\n\r\nRoute not found";
+    Logger& logger = Logger::get_instance();
+    bool keep_alive = true;
+    int request_count = 0;
+    while (keep_alive && running && request_count < max_keep_alive_requests) {
+        try {
+            HttpRequest request = HttpRequestParser::parse(client_fd);
+            request_count++;
+            handle_request(client_fd, request, keep_alive, request_count);
+        } catch (const std::exception& e) {
+            logger.error(std::format("Error processing request on client {}: {}", client_fd, e.what()));
+            break;
+        }
     }
-    ssize_t bytes_sent = send(client_fd, response.c_str(), response.size() , 0) ;
-    if (bytes_sent < 0) {
-        Logger::get_instance().error(std::format("Send failed for client {}: {}", client_fd, strerror(errno)));
-    } else if (bytes_sent < static_cast<ssize_t>(strlen(response.c_str()))) {
-        Logger::get_instance().warning(std::format("Incomplete send for client {}: sent {} bytes", client_fd, bytes_sent));
+    logger.info(std::format("Closing connection for client {} after {} requests", client_fd, request_count));
+}
+
+void HttpServer::handle_request(int client_fd, HttpRequest& request, bool& keep_alive, int& request_count) {
+    Logger& logger = Logger::get_instance();
+    keep_alive = should_keep_alive(request, request_count);
+    auto route_key = std::make_pair(request.method, request.route);
+    auto route_it = router.get_route(route_key);
+    HttpResponse response;
+    if (route_it.has_value()) {
+        response = route_it.value()->second(request);
     } else {
-        Logger::get_instance().info(std::format("Handled client request: {}", client_fd));
+        response.set_status(HttpStatusCode::NotFound);
+        response.set_content_type(MimeType::TextPlain);
+        response.set_body("Route not found");
+    }
+    if (keep_alive) {
+        response.set_header("Connection", "keep-alive");
+        response.set_header("Keep-Alive", 
+            std::format("timeout={}, max={}", keep_alive_timeout, max_keep_alive_requests)); 
+    } else {
+        response.set_header("Connection", "close");
+    }
+    std::string response_str = response.to_string();
+    ssize_t bytes_sent = send(client_fd, response_str.c_str(), response_str.size(), 0);
+    if (bytes_sent < 0) {
+        logger.error(std::format("Send failed for client {}: {}", client_fd, strerror(errno)));
+        keep_alive = false;
+    } else if (bytes_sent < static_cast<ssize_t>(response_str.size())) {
+        logger.warning(std::format("Incomplete send for client {}: sent {} bytes", client_fd, bytes_sent));
+        keep_alive = false;
+    } else {
+        logger.info(std::format("Handled request {} for client {}", request_count, client_fd));
     }
 }
+
+bool HttpServer::should_keep_alive(const HttpRequest& request, int request_count) const {
+    if (request_count >= max_keep_alive_requests) {
+        return false;
+    }
+    auto connection_it = request.headers.find("Connection");
+    if (connection_it != request.headers.end()) {
+        std::string connection_value = connection_it->second;
+        std::transform(connection_value.begin(), connection_value.end(), 
+                       connection_value.begin(), 
+                       ::tolower);
+        if (connection_value == "close") {
+            return false;
+        } else if (connection_value == "keep-alive") {
+            return true;
+        }
+    }
+    if (request.version == "HTTP/1.1") {
+        return true;
+    }
+    return false;
+}
+
+

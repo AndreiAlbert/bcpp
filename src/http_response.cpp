@@ -1,12 +1,8 @@
 #include "../include/http_response.hpp"
-#include <algorithm>
-#include <format>
-#include <iostream>
 #include <optional>
 #include <sstream>
 #include <string>
 #include <unordered_map>
-#include <vector>
 
 void HttpResponse::set_status(HttpStatusCode code) {
     status_.set_status(code);
@@ -62,6 +58,5 @@ std::string HttpResponse::to_string() {
     if (!body_.empty()) {
         oss << body_;
     }
-    oss << "\r\n";
     return oss.str();
 }
