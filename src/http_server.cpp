@@ -136,11 +136,10 @@ void HttpServer::handle_connection(int client_fd) {
 void HttpServer::handle_request(int client_fd, HttpRequest& request, bool& keep_alive, int& request_count) {
     Logger& logger = Logger::get_instance();
     keep_alive = should_keep_alive(request, request_count);
-    auto route_key = std::make_pair(request.method, request.route);
-    auto route_it = router.get_route(route_key);
+    auto handler = router.match_route(request.method, request.route, request);
     HttpResponse response;
-    if (route_it.has_value()) {
-        response = route_it.value()->second(request);
+    if (handler.has_value()) {
+        response = handler.value()(request);
     } else {
         response.set_status(HttpStatusCode::NotFound);
         response.set_content_type(MimeType::TextPlain);

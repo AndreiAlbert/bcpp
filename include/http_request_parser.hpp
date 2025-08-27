@@ -19,6 +19,7 @@ struct HttpRequest {
     std::string version;
     std::map<std::string, std::string> headers; 
     std::map<std::string, std::string> query_params;
+    std::map<std::string, std::string> path_params; 
     std::string body;
     std::string to_string() const;
 };
