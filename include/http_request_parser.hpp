@@ -4,34 +4,39 @@
 #include <string>
 
 enum class RequestMethod {
-    GET,
-    HEAD,
-    OPTIONS,
-    POST, 
-    DELETE,
-    PUT 
+    GET, HEAD, OPTIONS, POST, DELETE, PUT
 };
 
 struct HttpRequest {
-    RequestMethod method; 
-    std::string full_route; 
+    RequestMethod method;
+    std::string full_route;
     std::string route;
     std::string version;
-    std::map<std::string, std::string> headers; 
+    std::map<std::string, std::string> headers;
     std::map<std::string, std::string> query_params;
-    std::map<std::string, std::string> path_params; 
+    std::map<std::string, std::string> path_params;
     std::string body;
-    std::string to_string() const;
 };
-
 
 class HttpRequestParser {
 public:
-    static HttpRequest parse(int client_fd);
-    static std::string enum_to_string_method(const RequestMethod& method);
+    HttpRequestParser();
+    bool parse(const std::string& data);
+    
+    HttpRequest get_request() const;
+    
+    void reset();
+
 private:
-    static void parse_headers(HttpRequest& request, const std::string& header_data);
-    static void parse_request_line(HttpRequest& request, const std::string& line);
-    static size_t get_content_length(const HttpRequest& request);
-    static RequestMethod string_to_enum_method(const std::string& method);
+    enum class ParseState {
+        REQUEST_LINE, HEADERS, BODY, COMPLETE
+    };
+
+    void parse_headers(const std::string& header_data);
+    void parse_request_line(const std::string& line);
+    size_t get_content_length();
+
+    ParseState state_;
+    HttpRequest request_;
+    std::string buffer_;
 };
