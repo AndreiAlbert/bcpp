@@ -2,6 +2,7 @@
 #include "../include/logger.hpp"
 #include <algorithm>
 #include <format>
+#include <optional>
 #include <sstream>
 
 HttpRequestParser::HttpRequestParser() {
@@ -87,10 +88,59 @@ void HttpRequestParser::parse_request_line(const std::string& line) {
     size_t query_pos = request_.full_route.find('?');
     if (query_pos != std::string::npos) {
         request_.route = request_.full_route.substr(0, query_pos);
-        // You could add full query param parsing here if needed.
+        std::string query_string = request_.full_route.substr(query_pos + 1);
+        parse_query_params(query_string);
     } else {
         request_.route = request_.full_route;
     }
+}
+
+void HttpRequestParser::parse_query_params(const std::string& query_string) {
+    if(query_string.empty()) {
+        return;
+    }
+    std::istringstream ss(query_string);
+    std::string pair;
+    while (std::getline(ss, pair, '&')) {
+        if(pair.empty()) {
+            continue;
+        }
+        size_t eq_pos = pair.find('=');
+        std::string key, value;
+        if(eq_pos != std::string::npos) {
+            key = pair.substr(0, eq_pos);
+            value = pair.substr(eq_pos + 1);
+        } else {
+            key = pair;
+            value = "";
+        }
+        key = url_decode(key);
+        value = url_decode(value);
+        request_.query_params[key] = value;
+    }
+}
+
+std::string HttpRequestParser::url_decode(const std::string& encoded) {
+    std::string decoded;
+    decoded.reserve(encoded.size());
+    for (size_t i = 0; i < encoded.size(); ++i) {
+        if (encoded[i] == '%' && i + 2 < encoded.size()) {
+            std::string hex = encoded.substr(i + 1, 2);
+            
+            try {
+                int value = std::stoi(hex, nullptr, 16);
+                decoded += static_cast<char>(value);
+                i += 2; 
+            } catch (const std::exception&) {
+                decoded += encoded[i];
+            }
+        } else if (encoded[i] == '+') {
+            decoded += ' ';
+        } else {
+            decoded += encoded[i];
+        }
+    }
+    return decoded;
 }
 
 size_t HttpRequestParser::get_content_length() {
@@ -99,9 +149,25 @@ size_t HttpRequestParser::get_content_length() {
         try {
             return std::stoul(it->second);
         } catch (...) {
-            // Handle invalid Content-Length header
             return 0;
         }
     }
     return 0;
+}
+
+std::optional<std::string> HttpRequest::get_query_param(const std::string& key) const {
+    auto it = query_params.find(key);
+    if(it == query_params.end()) {
+        return std::nullopt;
+    }
+    return std::make_optional(it->second);
+}
+
+
+std::optional<std::string> HttpRequest::get_path_param(const std::string& key) const {
+    auto it = path_params.find(key);
+    if(it == path_params.end()) {
+        return std::nullopt;
+    }
+    return std::make_optional(it->second);
 }

@@ -13,4 +13,3 @@ file(GLOB SOURCES ${CMAKE_SOURCE_DIR}/src/*.cpp)
 target_sources(bcpp PRIVATE ${SOURCES})
 
 target_compile_options(bcpp PRIVATE -Wall -Wextra -Werror -g)
-

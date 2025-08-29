@@ -1,6 +1,7 @@
 #pragma once
 
 #include <map>
+#include <optional>
 #include <string>
 
 enum class RequestMethod {
@@ -15,6 +16,8 @@ struct HttpRequest {
     std::map<std::string, std::string> headers;
     std::map<std::string, std::string> query_params;
     std::map<std::string, std::string> path_params;
+    std::optional<std::string> get_query_param(const std::string& key) const;
+    std::optional<std::string> get_path_param(const std::string& key) const;
     std::string body;
 };
 
@@ -34,6 +37,8 @@ private:
 
     void parse_headers(const std::string& header_data);
     void parse_request_line(const std::string& line);
+    void parse_query_params(const std::string& query_string);
+    std::string url_decode(const std::string& encoded);
     size_t get_content_length();
 
     ParseState state_;
